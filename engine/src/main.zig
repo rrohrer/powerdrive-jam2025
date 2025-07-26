@@ -56,6 +56,31 @@ pub export fn eventHandler(playdate: *pdapi.PlaydateAPI, event: pdapi.PDSystemEv
     return 0;
 }
 
+const BackBuffer = struct {
+    const Self = @This();
+    const width: usize = 400;
+    const height: usize = 240;
+    const stride: usize = 52;
+
+    data: [*c]u8,
+
+    pub fn init(data: [*c]u8) Self {
+        return Self{ .data = data };
+    }
+
+    pub fn setPixel(self: *const Self, x: usize, y: usize, color: pdapi.LCDSolidColor) void {
+        const row_offset = y * stride;
+        const col_byte = x / 8;
+        const bit: u3 = @intCast((7) - x % 8);
+        const pixel_byte = self.data[row_offset + col_byte];
+        self.data[row_offset + col_byte] = switch (color) {
+            .ColorBlack => pixel_byte & ~(@as(u8, 1) << bit),
+            .ColorWhite => pixel_byte | (@as(u8, 1) << bit),
+            else => pixel_byte,
+        };
+    }
+};
+
 fn update_and_render(userdata: ?*anyopaque) callconv(.C) c_int {
     //TODO: replace with your own code!
 
@@ -98,6 +123,18 @@ fn update_and_render(userdata: ?*anyopaque) callconv(.C) c_int {
     _ = pixel_width;
 
     playdate.graphics.fillRect(0, 0, 50, 50, @intFromEnum(pdapi.LCDSolidColor.ColorBlack));
+    const back_buffer = BackBuffer.init(playdate.graphics.getFrame());
+    for (50..100) |x| {
+        for (50..100) |y| {
+            back_buffer.setPixel(x, y, .ColorBlack);
+        }
+    }
+    for (60..90) |x| {
+        for (60..90) |y| {
+            back_buffer.setPixel(x, y, .ColorWhite);
+        }
+    }
+    playdate.graphics.markUpdatedRows(50, 100);
 
     //returning 1 signals to the OS to draw the frame.
     //we always want this frame drawn
